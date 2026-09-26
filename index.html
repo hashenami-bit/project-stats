@@ -377,12 +377,13 @@ function fetchStatus(){
     return r.json();
   }).then(function(j){ return {data:JSON.parse(b64decode(j.content)), sha:j.sha}; });
 }
+var gen=0; // bumps on every save, so an older in-flight refresh cannot overwrite newer data
 function keep(res){ DATA=res.data; SHA=res.sha; syncedAt=new Date().toISOString(); lsSet('ps-cache',JSON.stringify({data:DATA,sha:SHA,at:syncedAt})); }
 function load(){
   if(!token){ render(); return Promise.resolve(); }
-  setSync('busy');
-  return fetchStatus().then(function(res){ keep(res); lastError=''; setSync('on'); render(); })
-    .catch(function(e){ lastError = navigator.onLine===false ? 'You are offline. Showing the last saved copy.' : (e.message||'Could not reach GitHub.'); setSync(DATA?'warn':'off'); render(); });
+  setSync('busy'); var my=++gen;
+  return fetchStatus().then(function(res){ if(my!==gen) return; keep(res); lastError=''; setSync('on'); render(); })
+    .catch(function(e){ if(my!==gen) return; lastError = navigator.onLine===false ? 'You are offline. Showing the last saved copy.' : (e.message||'Could not reach GitHub.'); setSync(DATA?'warn':'off'); render(); });
 }
 /* read the newest file, apply the change, write it back; retry if someone else wrote in between */
 function commitChange(mutate,message,tries){
@@ -396,7 +397,7 @@ function commitChange(mutate,message,tries){
       .then(function(r){
         if(r.status===409 && tries<3) return commitChange(mutate,message,tries+1);
         if(!r.ok) throw new Error(explain(r.status));
-        return r.json().then(function(j){ keep({data:res.data, sha:j.content.sha}); lastError=''; setSync('on'); render(); return true; });
+        return r.json().then(function(j){ gen++; keep({data:res.data, sha:j.content.sha}); lastError=''; setSync('on'); render(); return true; });
       });
   }).catch(function(e){ lastError=e.message||'Could not save.'; setSync(DATA?'warn':'off'); render(); return false; });
 }
@@ -406,7 +407,9 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){retu
 function stages(){ return (DATA&&DATA.stages)||['Idea','Building','Testing','Review','Shipped']; }
 function groups(){ return (DATA&&DATA.groups)||[]; }
 function norm(p){
+  function num(v,lo,hi){ v=Number(v); return isFinite(v)?Math.max(lo,Math.min(hi,Math.round(v))):lo; }
   var x=Object.assign({quests:[],about:[],features:[],stack:[],stats:[],attrs:[],achievements:[],where:[],timeline:[],log:[],doneQuests:{}},p);
+  x.stage=num(x.stage,0,4); x.progress=num(x.progress,0,100); x.health=num(x.health,0,100); x.paused=!!x.paused;
   x.timeline = x.timeline.concat((x.log||[]).filter(function(l){return l&&l.date&&l.text;}).map(function(l){return [String(l.date),String(l.text)];}))
     .sort(function(a,b){return a[0]<b[0]?-1:a[0]>b[0]?1:0;});
   if(x.timeline.length){ var last=x.timeline[x.timeline.length-1][0]; if(!x.lastActivity||last>x.lastActivity) x.lastActivity=last; }
