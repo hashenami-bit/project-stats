@@ -10,13 +10,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Stats">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0A0E19">
+<meta name="theme-color" content="#05060B">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,700;0,800;1,800&family=Rajdhani:wght@500;600;700&display=swap">
 <style>
 /*__BASE_CSS__*/
 /* ---- app additions ---- */
@@ -184,7 +184,27 @@ function level(p){ return Math.max(1,Math.round((p.progress||0)/10)); }
 function stageLabel(p){ return p.paused ? 'Paused' : stages()[p.stage]||'—'; }
 function stageCls(p){ return p.paused ? 'st-p' : 'st-'+p.stage; }
 function glyph(k){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+(G[k]||G.repo)+'</svg>'; }
-function segs(kind,val,extra){ var on=Math.round(val/5), h=''; for(var i=0;i<20;i++) h+='<i class="'+(i<on?'on':'')+'"></i>'; return '<div class="segs '+kind+' '+(extra||'')+'" role="img" aria-label="'+val+' of 100">'+h+'</div>'; }
+function segs(kind,val,extra){ var v=Math.max(0,Math.min(100,+val||0)); return '<div class="meter '+kind+' '+(extra||'')+'" role="img" aria-label="'+v+' of 100"><i style="width:'+v+'%"></i></div>'; }
+var RANKS=[[0,'Bronze'],[40,'Silver'],[60,'Gold'],[75,'Platinum'],[85,'Diamond'],[95,'Legend']];
+function rankOf(v){ var cur=RANKS[0], next=RANKS[1]; for(var i=0;i<RANKS.length;i++){ if(v>=RANKS[i][0]){ cur=RANKS[i]; next=RANKS[i+1]||null; } } return {cur:cur,next:next}; }
+function accentOf(p){ if(p.paused) return 'var(--purple)'; if(flagCount(p,'red')) return 'var(--bad)'; if(flagCount(p,'yellow')) return 'var(--yfill)'; return 'var(--good)'; }
+function heroHTML(avg,sub,tiles,reds,alertHref){
+  var rk=rankOf(avg);
+  return '<section class="hero" aria-label="Summary"><div class="gauge" style="--v:'+avg+'"><div class="ticks"></div><div class="arc"></div><div class="knob"></div>'+
+    '<div class="core"><b class="gnum" data-v="'+avg+'">'+avg+'<span>%</span></b><small>Overall progress</small></div></div>'+
+    '<div class="rname">'+rk.cur[1]+'</div><p class="rsub">'+sub+'</p><div class="xpbar"><i style="width:'+avg+'%"></i></div>'+
+    '<div class="xpl"><span>'+rk.cur[1]+' from '+rk.cur[0]+'%</span><span>'+(rk.next?rk.next[1]+' at '+rk.next[0]+'%':'Top rank reached')+'</span></div></section>'+
+    '<div class="tiles">'+tiles.map(function(t){return '<div class="tile" style="--c:'+t[2]+'"><b>'+t[0]+'</b><span>'+t[1]+'</span></div>';}).join('')+'</div>'+
+    (reds ? (alertHref?'<a class="alert" href="'+alertHref+'">':'<div class="alert">')+'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>'+reds+' critical quest'+(reds===1?' needs':'s need')+' you'+(alertHref?'</a>':'</div>') : '');
+}
+var gaugeDone=false;
+function animateGauge(){
+  if(gaugeDone) return; var el=document.querySelector('.gnum'); if(!el) return; gaugeDone=true;
+  try{ if(matchMedia('(prefers-reduced-motion: reduce)').matches) return; }catch(e){}
+  var v=+el.getAttribute('data-v'), t0=null;
+  function f(t){ t0=t0||t; var k=Math.min(1,(t-t0)/1200); if(el.firstChild) el.firstChild.nodeValue=Math.round(v*(1-Math.pow(1-k,3))); if(k<1) requestAnimationFrame(f); }
+  requestAnimationFrame(f);
+}
 function hpClass(v){ return v<45?'low':v<70?'mid':''; }
 function barsHTML(p){ var en=energy(p); return '<div class="bars">'+
   '<div class="barrow"><span>Progress</span>'+segs('xp',p.progress)+'<b>'+p.progress+'%</b></div>'+
@@ -221,9 +241,8 @@ function viewBoard(){
   var shipped=ps.filter(function(p){return p.stage===4;}).length;
   var lastDay=ps.map(function(p){return p.lastActivity;}).sort().pop();
   var r=44, c=2*Math.PI*r, off=c*(1-avg/100);
-  var h='<section class="hud player"><div class="lvl"><svg viewBox="0 0 108 108" aria-hidden="true"><circle cx="54" cy="54" r="'+r+'" fill="none" stroke="var(--seg-off)" stroke-width="8"/><circle cx="54" cy="54" r="'+r+'" fill="none" stroke="var(--gold)" stroke-width="8" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 54 54)"/></svg><div class="lvl-in"><small>Overall</small><strong class="num">'+avg+'%</strong></div></div>'+
-    '<div><h1>Your project board</h1><p class="sub">'+ps.length+' projects. Last activity '+ago(lastDay)+'. Synced '+agoTime(syncedAt)+'.</p>'+
-    '<div class="chips">'+chip(ps.length,'projects')+chip(active,'in progress')+chip(shipped,'shipped')+chip(reds,'red problems',reds?'red':'')+chip(openAll,'open quests')+chip(doneAll,'quests cleared')+'</div></div></section>';
+  var h=heroHTML(avg, ps.length+' projects, last activity '+ago(lastDay)+', synced '+agoTime(syncedAt),
+    [[ps.length,'projects','var(--cyan)'],[active,'in progress','var(--good)'],[reds,'red problems','var(--bad)'],[doneAll,'cleared','var(--gold)']], reds, '#quests');
   if(lastError) h+='<p class="err" role="alert">'+esc(lastError)+'</p>';
   var gs=groups(), counts={all:ps.length};
   gs.forEach(function(g){counts[g.id]=ps.filter(function(p){return p.group===g.id;}).length;});
@@ -243,7 +262,7 @@ function viewBoard(){
 }
 function card(p){
   var r=flagCount(p,'red'), y=flagCount(p,'yellow'), g=flagCount(p,'green')+flagCount(p,'q');
-  return '<a class="hud card" href="#'+esc(p.id)+'"><div class="card-top"><div class="glyph">'+glyph(p.glyph)+'</div><div><h3>'+esc(p.name)+'</h3><p class="cls">'+esc(p.cls)+'</p></div><div class="lv"><small>Level</small><b>'+level(p)+'</b></div></div>'+
+  return '<a class="hud card" href="#'+esc(p.id)+'" style="--c:'+accentOf(p)+'"><div class="card-top"><div class="glyph">'+glyph(p.glyph)+'</div><div><h3>'+esc(p.name)+'</h3><p class="cls">'+esc(p.cls)+'</p></div><div class="lv"><small>Level</small><b>'+level(p)+'</b></div></div>'+
     '<div><span class="stagepill '+stageCls(p)+'">'+stageLabel(p)+'</span></div><p class="tagline">'+esc(p.tagline)+'</p>'+barsHTML(p)+
     '<div class="card-foot"><div class="flags"><span class="flag"><i class="dia red"></i>'+r+'</span><span class="flag"><i class="dia yellow"></i>'+y+'</span><span class="flag"><i class="dia green"></i>'+g+'</span></div>'+
     '<span style="margin-left:auto">'+(p.repo?'On GitHub, ':'Only on the Mac, ')+'active '+ago(p.lastActivity)+'</span><p class="next"><em>Next:</em> '+esc(p.next)+'</p></div></a>';
@@ -286,7 +305,7 @@ function radar(attrs){
     var anchor=Math.abs(l[0]-cx)<8?'middle':(l[0]>cx?'start':'end');
     labels+='<text x="'+l[0].toFixed(1)+'" y="'+l[1].toFixed(1)+'" text-anchor="'+anchor+'" dominant-baseline="middle">'+esc(attrs[i][0])+' <tspan class="val">'+v+'</tspan></text>';
     pts.push(pt(i,Math.max(v,0.3)).map(function(x){return x.toFixed(1);}).join(',')); }
-  return '<svg class="radar" viewBox="0 0 340 300" role="img" aria-label="Skill chart">'+rings+axes+'<polygon points="'+pts.join(' ')+'" fill="color-mix(in srgb,var(--gold) 22%,transparent)" stroke="var(--gold)" stroke-width="2"/>'+labels+'</svg>';
+  return '<svg class="radar" viewBox="0 0 340 300" role="img" aria-label="Skill chart">'+rings+axes+'<polygon points="'+pts.join(' ')+'" fill="color-mix(in srgb,var(--purple) 28%,transparent)" stroke="var(--purple)" stroke-width="2"/>'+labels+'</svg>';
 }
 function ghHTML(p){
   var g=p.github, l=p.local, h='';
@@ -297,7 +316,7 @@ function ghHTML(p){
 function viewDetail(p){
   var S=stages(), r=flagCount(p,'red');
   var h='<a class="back" href="#">&#8592; All projects</a>';
-  h+='<section class="hud dhead"><div class="glyph">'+glyph(p.glyph)+'</div><div><h1>'+esc(p.name)+'</h1><p class="cls">'+esc(p.cls)+' &nbsp;<span class="stagepill '+stageCls(p)+'">'+stageLabel(p)+'</span></p><p class="tagline">'+esc(p.tagline)+'</p></div>'+
+  h+='<section class="hud dhead" style="--c:'+accentOf(p)+'"><span class="bgnum" aria-hidden="true">'+level(p)+'</span><div class="glyph">'+glyph(p.glyph)+'</div><div><h1>'+esc(p.name)+'</h1><p class="cls">'+esc(p.cls)+' &nbsp;<span class="stagepill '+stageCls(p)+'">'+stageLabel(p)+'</span></p><p class="tagline">'+esc(p.tagline)+'</p></div>'+
     '<div class="dlv"><small>Level</small><b class="num">'+level(p)+'</b><small>active '+ago(p.lastActivity)+'</small></div></section>';
   h+='<div class="track">'+S.map(function(s,i){return '<div class="'+(i<p.stage?'done':i===p.stage?'now':'')+'">'+esc(s)+'</div>';}).join('')+'</div>';
   h+='<div class="dgrid"><div class="col">';
@@ -341,7 +360,7 @@ function render(){
   else html=viewBoard();
   var ae=document.activeElement;
   if(ae && ae.closest && ae.closest('#app') && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && lastRoute===id) return; // don't wipe typing
-  app.innerHTML=html;
+  app.innerHTML=html; animateGauge();
   document.querySelectorAll('.tabbar a').forEach(function(a){ if(a.getAttribute('data-tab')===tab) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
   var reds=all().reduce(function(s,p){return s+flagCount(p,'red');},0), b=document.getElementById('qBadge');
   b.hidden=!reds; b.textContent=reds;
@@ -399,7 +418,7 @@ function applyMode(m){
   var root=document.documentElement;
   if(m==='light'||m==='dark'){ root.setAttribute('data-theme',m); lsSet('ps-theme',m); } else { root.removeAttribute('data-theme'); lsSet('ps-theme',null); }
   var dark = root.getAttribute('data-theme')==='dark' || (!root.getAttribute('data-theme') && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.querySelector('meta[name="theme-color"]').setAttribute('content', dark?'#0A0E19':'#E9EDF4');
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', dark?'#05060B':'#EDF1FB');
 }
 applyMode(lsGet('ps-theme')||'auto');
 
