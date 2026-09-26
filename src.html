@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Project Stats</title>
+<meta name="description" content="Personal project status board. Data loads from a private GitHub repo after you connect.">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stats">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0A0E19">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/*__BASE_CSS__*/
+/* ---- app additions ---- */
+[hidden]{display:none!important}
+img{max-width:100%}
+html{height:100%}
+body{margin:0}
+body{padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+.bar{top:0;padding-top:calc(10px + env(safe-area-inset-top,0px));margin-top:calc(-1 * env(safe-area-inset-top,0px))}
+.iconbtn{border:1px solid var(--line);background:var(--panel);width:34px;height:34px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.iconbtn svg{width:16px;height:16px}
+.iconbtn.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.live.warn i{background:var(--warn)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);
+  background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;text-decoration:none;color:var(--faint);font-size:11.5px;font-weight:600;font-family:var(--display);position:relative}
+.tabbar a svg{width:22px;height:22px}
+.tabbar a[aria-current="page"]{color:var(--gold)}
+.tabbar a[aria-current="page"]::before{content:"";position:absolute;top:-7px;left:30%;right:30%;height:2px;background:var(--gold)}
+.tabbar .badge{position:absolute;top:2px;left:calc(50% + 6px);background:var(--bad);color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:8px;display:grid;place-items:center;padding:0 4px;font-family:var(--body)}
+.connect{max-width:560px;margin:28px auto 0;padding:22px}
+.connect h1{font-size:28px}
+.connect ol{margin:12px 0 0;padding-left:20px;display:grid;gap:8px;font-size:15px}
+.connect code{font-size:13px;background:var(--panel2);padding:1px 5px;border:1px solid var(--line)}
+.err{color:var(--bad);font-size:14px;margin-top:10px}
+.ghbox{margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);font-size:14px}
+.ghbox b{font-family:var(--display)}
+.ghbox a{color:var(--cyan)}
+.newrepo{padding:14px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.newrepo b{font-family:var(--display);font-size:16px}
+.newrepo span{color:var(--muted);font-size:13.5px}
+.setrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--line2)}
+.btn.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+@media (max-width:680px){ .bar .brand b{font-size:16px} .mode button{padding:5px 8px} }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z"/><path d="M8 13.5l2.5-3 2 2 3.5-4"/></svg></span>
+      <b>Project Stats</b>
+    </a>
+    <div class="spacer"></div>
+    <span class="live" id="live"><i></i><span id="liveText">Offline</span></span>
+    <button type="button" class="iconbtn" id="refresh" aria-label="Refresh from GitHub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<nav class="tabbar" aria-label="Sections">
+  <a href="#" data-tab="board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>Board</a>
+  <a href="#quests" data-tab="quests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5l1 1 2-2M4 11l1 1 2-2M4 17l1 1 2-2"/></svg>Quests<span class="badge" id="qBadge" hidden></span></a>
+  <a href="#log" data-tab="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Log</a>
+  <a href="#settings" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
+</nav>
+
+<script>
+(function(){
+'use strict';
+
+/* This page holds NO project data. It loads status.json from a private
+   GitHub repo using a token that stays in this device's storage only. */
+
+var DEFAULTS = {owner:'hashenami-bit', repo:'project-stats-data', path:'status.json'};
+var G = {
+  hospital:'<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/><circle cx="16" cy="9" r="2"/>',
+  net:'<rect x="9" y="2" width="6" height="5"/><rect x="2" y="17" width="6" height="5"/><rect x="16" y="17" width="6" height="5"/><path d="M12 7v5M5 17v-3h14v3"/>',
+  data:'<circle cx="6" cy="17" r="1.6"/><circle cx="10" cy="11" r="1.6"/><circle cx="15" cy="14" r="1.6"/><circle cx="19" cy="6" r="1.6"/><path d="M3 21h18M3 3v18"/>',
+  box:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/><path d="M7.5 5l9 4"/>',
+  compass:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  briefcase:'<rect x="3" y="7" width="18" height="13"/><path d="M9 7V4h6v3M3 13h18"/>',
+  chat:'<path d="M4 4h16v12H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+  layers:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  phone:'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
+  heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  gift:'<rect x="3" y="9" width="18" height="12"/><path d="M3 13h18M12 9v12M12 9c-2-4-6-4-6-1s6 1 6 1zm0 0c2-4 6-4 6-1s-6 1-6 1z"/>',
+  wrench:'<path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3l9.4-9.4a4 4 0 0 1-2-2z"/>',
+  repo:'<path d="M5 3h12v18H7a2 2 0 0 1-2-2z"/><path d="M5 17a2 2 0 0 1 2-2h10M9 7h4"/>'
+};
+
+/* ---------- storage (device only) ---------- */
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ if(v===null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} }
+var cfg = (function(){ try{ return Object.assign({},DEFAULTS,JSON.parse(lsGet('ps-cfg')||'{}')); }catch(e){ return Object.assign({},DEFAULTS); } })();
+var token = lsGet('ps-token') || '';
+var DATA = null, SHA = null, syncedAt = null, syncState = 'off', lastError = '';
+try{ var c=JSON.parse(lsGet('ps-cache')||'null'); if(c&&c.data){ DATA=c.data; SHA=c.sha; syncedAt=c.at; } }catch(e){}
+var filter = lsGet('ps-filter') || 'all';
+var feedAll = false;
+
+/* ---------- GitHub API ---------- */
+function apiUrl(){ return 'https://api.github.com/repos/'+encodeURIComponent(cfg.owner)+'/'+encodeURIComponent(cfg.repo)+'/contents/'+cfg.path.split('/').map(encodeURIComponent).join('/'); }
+function headers(){ return {'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}; }
+function b64decode(s){ var bin=atob(s.replace(/\s/g,'')); var bytes=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return new TextDecoder().decode(bytes); }
+function b64encode(str){ var bytes=new TextEncoder().encode(str), bin=''; for(var i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000)); return btoa(bin); }
+function explain(status){
+  if(status===401) return 'GitHub did not accept the token. Make a new one and paste it in Settings.';
+  if(status===403) return 'The token is missing permission. It needs Contents: Read and write on '+cfg.repo+'.';
+  if(status===404) return 'GitHub could not find '+cfg.owner+'/'+cfg.repo+'/'+cfg.path+'. Check the names in Settings, and that the token can see that repo.';
+  return 'GitHub answered with error '+status+'. Try again in a minute.';
+}
+function fetchStatus(){
+  return fetch(apiUrl()+'?t='+Date.now(),{headers:headers(),cache:'no-store'}).then(function(r){
+    if(!r.ok) throw new Error(explain(r.status));
+    return r.json();
+  }).then(function(j){ return {data:JSON.parse(b64decode(j.content)), sha:j.sha}; });
+}
+function keep(res){ DATA=res.data; SHA=res.sha; syncedAt=new Date().toISOString(); lsSet('ps-cache',JSON.stringify({data:DATA,sha:SHA,at:syncedAt})); }
+function load(){
+  if(!token){ render(); return Promise.resolve(); }
+  setSync('busy');
+  return fetchStatus().then(function(res){ keep(res); lastError=''; setSync('on'); render(); })
+    .catch(function(e){ lastError = navigator.onLine===false ? 'You are offline. Showing the last saved copy.' : (e.message||'Could not reach GitHub.'); setSync(DATA?'warn':'off'); render(); });
+}
+/* read the newest file, apply the change, write it back; retry if someone else wrote in between */
+function commitChange(mutate,message,tries){
+  tries = tries||0;
+  setSync('busy');
+  return fetchStatus().then(function(res){
+    mutate(res.data);
+    res.data.updatedAt = new Date().toISOString();
+    return fetch(apiUrl(),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},headers()),
+      body:JSON.stringify({message:message+' (from phone)',content:b64encode(JSON.stringify(res.data,null,1)+'\n'),sha:res.sha})})
+      .then(function(r){
+        if(r.status===409 && tries<3) return commitChange(mutate,message,tries+1);
+        if(!r.ok) throw new Error(explain(r.status));
+        return r.json().then(function(j){ keep({data:res.data, sha:j.content.sha}); lastError=''; setSync('on'); render(); return true; });
+      });
+  }).catch(function(e){ lastError=e.message||'Could not save.'; setSync(DATA?'warn':'off'); render(); return false; });
+}
+
+/* ---------- helpers ---------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function stages(){ return (DATA&&DATA.stages)||['Idea','Building','Testing','Review','Shipped']; }
+function groups(){ return (DATA&&DATA.groups)||[]; }
+function norm(p){
+  var x=Object.assign({quests:[],about:[],features:[],stack:[],stats:[],attrs:[],achievements:[],where:[],timeline:[],log:[],doneQuests:{}},p);
+  x.timeline = x.timeline.concat((x.log||[]).filter(function(l){return l&&l.date&&l.text;}).map(function(l){return [String(l.date),String(l.text)];}))
+    .sort(function(a,b){return a[0]<b[0]?-1:a[0]>b[0]?1:0;});
+  if(x.timeline.length){ var last=x.timeline[x.timeline.length-1][0]; if(!x.lastActivity||last>x.lastActivity) x.lastActivity=last; }
+  if(x.github && x.github.lastCommitDate && x.github.lastCommitDate.slice(0,10)>x.lastActivity) x.lastActivity=x.github.lastCommitDate.slice(0,10);
+  if(x.local && x.local.lastCommitDate && x.local.lastCommitDate.slice(0,10)>x.lastActivity) x.lastActivity=x.local.lastCommitDate.slice(0,10);
+  return x;
+}
+function all(){ return ((DATA&&DATA.projects)||[]).map(norm); }
+function get(id){ var r=all().filter(function(p){return p.id===id;}); return r[0]||null; }
+function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function daysSince(ds){ if(!ds) return 99; var a=new Date(ds.slice(0,10)+'T12:00:00'), b=new Date(todayStr()+'T12:00:00'); return Math.max(0,Math.round((b-a)/864e5)); }
+function ago(ds){ var n=daysSince(ds); return n===0?'today':n===1?'yesterday':n<60?n+' days ago':Math.round(n/30)+' months ago'; }
+function agoTime(iso){ if(!iso) return 'never'; var m=Math.round((Date.now()-new Date(iso))/6e4); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':ago(iso); }
+function fmtDate(ds){ var d=new Date(ds.slice(0,10)+'T12:00:00'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+function energy(p){ if(p.paused) return Math.max(5,40-daysSince(p.lastActivity)*3); return Math.max(5,100-daysSince(p.lastActivity)*9); }
+function openQuests(p){ return p.quests.filter(function(q){return !p.doneQuests[q.id];}); }
+function flagCount(p,f){ return openQuests(p).filter(function(q){return q.flag===f;}).length; }
+function level(p){ return Math.max(1,Math.round((p.progress||0)/10)); }
+function stageLabel(p){ return p.paused ? 'Paused' : stages()[p.stage]||'—'; }
+function stageCls(p){ return p.paused ? 'st-p' : 'st-'+p.stage; }
+function glyph(k){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+(G[k]||G.repo)+'</svg>'; }
+function segs(kind,val,extra){ var on=Math.round(val/5), h=''; for(var i=0;i<20;i++) h+='<i class="'+(i<on?'on':'')+'"></i>'; return '<div class="segs '+kind+' '+(extra||'')+'" role="img" aria-label="'+val+' of 100">'+h+'</div>'; }
+function hpClass(v){ return v<45?'low':v<70?'mid':''; }
+function barsHTML(p){ var en=energy(p); return '<div class="bars">'+
+  '<div class="barrow"><span>Progress</span>'+segs('xp',p.progress)+'<b>'+p.progress+'%</b></div>'+
+  '<div class="barrow"><span>Health</span>'+segs('hp',p.health,hpClass(p.health))+'<b>'+p.health+'</b></div>'+
+  '<div class="barrow"><span>Energy</span>'+segs('en',en)+'<b>'+en+'</b></div></div>'; }
+function chip(v,l,cls){ return '<div class="chip '+(cls||'')+'"><b>'+v+'</b><span>'+l+'</span></div>'; }
+function legend(){ return '<div class="legend"><span><i class="dia red"></i>Red: broken or risky</span><span><i class="dia yellow"></i>Yellow: should fix</span><span><i class="dia green"></i>Green: nice to have</span><span><i class="dia q"></i>Question</span></div>'; }
+var ORDER={red:0,yellow:1,q:2,green:3};
+
+/* ---------- views ---------- */
+function viewConnect(){
+  return '<section class="hud connect"><h1>Connect your data</h1>'+
+    '<p class="sub" style="color:var(--muted);margin-top:6px">This app keeps no project data inside it. It reads your private <b>'+esc(cfg.owner)+'/'+esc(cfg.repo)+'</b> repo on GitHub, using a token that stays on this phone only.</p>'+
+    '<ol><li>On GitHub, open Settings → Developer settings → Fine-grained tokens → <b>Generate new token</b>.</li>'+
+    '<li>Repository access: <b>Only select repositories</b> → <code>'+esc(cfg.repo)+'</code>.</li>'+
+    '<li>Permissions → Repository → <b>Contents: Read and write</b>. Then generate and copy it.</li>'+
+    '<li>Paste it below and tap Connect.</li></ol>'+
+    tokenForm()+'</section>';
+}
+function tokenForm(){
+  return '<label class="field" for="sOwner">GitHub account<input type="text" id="sOwner" autocapitalize="off" autocomplete="off" spellcheck="false" value="'+esc(cfg.owner)+'"></label>'+
+    '<label class="field" for="sRepo">Data repo<input type="text" id="sRepo" autocapitalize="off" autocomplete="off" spellcheck="false" value="'+esc(cfg.repo)+'"></label>'+
+    '<label class="field" for="sToken">Token<input type="password" id="sToken" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="'+(token?'Saved on this device — paste to replace':'github_pat_…')+'"></label>'+
+    '<div class="setrow"><button type="button" class="btn" id="sSave">'+(token?'Save and reload':'Connect')+'</button>'+(token?'<button type="button" class="btn danger" id="sForget">Remove token from this phone</button>':'')+'</div>'+
+    (lastError?'<p class="err" role="alert">'+esc(lastError)+'</p>':'');
+}
+function viewBoard(){
+  var ps=all(); if(!ps.length) return '<p style="margin-top:24px">No projects in the data file yet.</p>';
+  var avg=Math.round(ps.reduce(function(s,p){return s+(p.progress||0);},0)/ps.length);
+  var active=ps.filter(function(p){return !p.paused && p.stage>0 && p.stage<4;}).length;
+  var reds=ps.reduce(function(s,p){return s+flagCount(p,'red');},0);
+  var openAll=ps.reduce(function(s,p){return s+openQuests(p).length;},0);
+  var doneAll=ps.reduce(function(s,p){return s+(p.quests.length-openQuests(p).length);},0);
+  var shipped=ps.filter(function(p){return p.stage===4;}).length;
+  var lastDay=ps.map(function(p){return p.lastActivity;}).sort().pop();
+  var r=44, c=2*Math.PI*r, off=c*(1-avg/100);
+  var h='<section class="hud player"><div class="lvl"><svg viewBox="0 0 108 108" aria-hidden="true"><circle cx="54" cy="54" r="'+r+'" fill="none" stroke="var(--seg-off)" stroke-width="8"/><circle cx="54" cy="54" r="'+r+'" fill="none" stroke="var(--gold)" stroke-width="8" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 54 54)"/></svg><div class="lvl-in"><small>Overall</small><strong class="num">'+avg+'%</strong></div></div>'+
+    '<div><h1>Your project board</h1><p class="sub">'+ps.length+' projects. Last activity '+ago(lastDay)+'. Synced '+agoTime(syncedAt)+'.</p>'+
+    '<div class="chips">'+chip(ps.length,'projects')+chip(active,'in progress')+chip(shipped,'shipped')+chip(reds,'red problems',reds?'red':'')+chip(openAll,'open quests')+chip(doneAll,'quests cleared')+'</div></div></section>';
+  if(lastError) h+='<p class="err" role="alert">'+esc(lastError)+'</p>';
+  var gs=groups(), counts={all:ps.length};
+  gs.forEach(function(g){counts[g.id]=ps.filter(function(p){return p.group===g.id;}).length;});
+  h+='<div class="tabs" role="group" aria-label="Filter projects">'+[['all','All']].concat(gs.map(function(g){return [g.id,g.name];})).map(function(t){
+    return '<button type="button" data-filter="'+t[0]+'" aria-pressed="'+(filter===t[0])+'">'+esc(t[1])+'<span>'+(counts[t[0]]||0)+'</span></button>'; }).join('')+'</div>';
+  gs.forEach(function(g){
+    if(filter!=='all' && filter!==g.id) return;
+    var list=ps.filter(function(p){return p.group===g.id;}); if(!list.length) return;
+    h+='<div class="section-h"><h2>'+esc(g.name)+'</h2><p>'+esc(g.note||'')+'</p></div><div class="grid '+(list.length===2||list.length===4?'g2':'g3')+'">'+list.map(card).join('')+'</div>';
+  });
+  var nr=(DATA&&DATA.newRepos)||[];
+  if(nr.length){
+    h+='<div class="section-h"><h2>New on GitHub</h2><p>Repos not on the board yet — ask Claude to add them</p></div><div class="grid g2">'+
+      nr.map(function(r){return '<a class="hud newrepo" href="https://github.com/'+esc(cfg.owner)+'/'+esc(r.name)+'" target="_blank" rel="noopener"><div class="glyph">'+glyph('repo')+'</div><div><b>'+esc(r.name)+'</b><br><span>'+esc(r.description||'No description')+' — pushed '+ago(r.pushedAt)+'</span></div></a>';}).join('')+'</div>';
+  }
+  return h;
+}
+function card(p){
+  var r=flagCount(p,'red'), y=flagCount(p,'yellow'), g=flagCount(p,'green')+flagCount(p,'q');
+  return '<a class="hud card" href="#'+esc(p.id)+'"><div class="card-top"><div class="glyph">'+glyph(p.glyph)+'</div><div><h3>'+esc(p.name)+'</h3><p class="cls">'+esc(p.cls)+'</p></div><div class="lv"><small>Level</small><b>'+level(p)+'</b></div></div>'+
+    '<div><span class="stagepill '+stageCls(p)+'">'+stageLabel(p)+'</span></div><p class="tagline">'+esc(p.tagline)+'</p>'+barsHTML(p)+
+    '<div class="card-foot"><div class="flags"><span class="flag"><i class="dia red"></i>'+r+'</span><span class="flag"><i class="dia yellow"></i>'+y+'</span><span class="flag"><i class="dia green"></i>'+g+'</span></div>'+
+    '<span style="margin-left:auto">'+(p.repo?'On GitHub, ':'Only on the Mac, ')+'active '+ago(p.lastActivity)+'</span><p class="next"><em>Next:</em> '+esc(p.next)+'</p></div></a>';
+}
+function questRow(p,q,showTag){
+  var done=!!p.doneQuests[q.id], can=!!token;
+  var tick = can ? '<button type="button" class="tick" role="checkbox" aria-checked="'+done+'" aria-label="Mark as done" data-p="'+esc(p.id)+'" data-q="'+esc(q.id)+'">'+(done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg>':'')+'</button>' : '<i class="dia '+q.flag+'"></i>';
+  return '<li class="q'+(done?' done':'')+'">'+tick+'<div><p>'+(can?'<i class="dia '+q.flag+'" style="margin-right:8px;vertical-align:1px"></i>':'')+esc(q.text)+'</p>'+(q.who?'<small>'+esc(q.who)+'</small>':'')+'</div>'+
+    (showTag?'<a class="tag" href="#'+esc(p.id)+'">'+esc(p.name)+'</a>':'<span></span>')+'</li>';
+}
+function viewQuests(){
+  var qs=[]; all().forEach(function(p){ openQuests(p).forEach(function(q){qs.push({p:p,q:q});}); });
+  qs.sort(function(a,b){return ORDER[a.q.flag]-ORDER[b.q.flag];});
+  return '<div class="section-h"><h2>Quest board</h2><p>Everything still open, most urgent first</p></div><section class="hud panel">'+legend()+
+    '<ul class="qlist">'+(qs.length?qs.map(function(x){return questRow(x.p,x.q,true);}).join(''):'<li class="q"><span></span><p>All clear.</p></li>')+'</ul><p class="note">Tick a quest to mark it done. It saves to GitHub and shows on every device.</p></section>';
+}
+function viewLog(){
+  var feed=[]; all().forEach(function(p){ p.timeline.forEach(function(t){feed.push({p:p,d:t[0],t:t[1]});}); });
+  feed.sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:0;});
+  var shown=feedAll?feed:feed.slice(0,25);
+  return '<div class="section-h"><h2>Activity log</h2><p>Newest first'+(DATA&&DATA.syncedFromGitHubAt?', GitHub checked '+agoTime(DATA.syncedFromGitHubAt):'')+'</p></div><section class="hud panel"><ul class="feed">'+
+    shown.map(function(f){return '<li><time>'+fmtDate(f.d)+'</time><p><a href="#'+esc(f.p.id)+'">'+esc(f.p.name)+'</a> '+esc(f.t)+'</p></li>';}).join('')+'</ul>'+
+    (feed.length>25?'<button type="button" class="showmore" id="feedMore">'+(feedAll?'Show less':'Show all '+feed.length+' entries')+'</button>':'')+'</section>';
+}
+function viewSettings(){
+  var mode=lsGet('ps-theme')||'auto';
+  return '<div class="section-h"><h2>Settings</h2><p>Saved on this phone only</p></div>'+
+    '<section class="hud panel"><h2>Colour mode</h2><div class="mode" role="group" aria-label="Colour mode" style="margin-top:10px">'+
+    ['auto','light','dark'].map(function(m){return '<button type="button" data-mode="'+m+'" aria-pressed="'+(mode===m)+'">'+(m==='auto'?'Match phone':m[0].toUpperCase()+m.slice(1))+'</button>';}).join('')+'</div></section>'+
+    '<section class="hud panel" style="margin-top:14px"><h2>GitHub connection</h2><p class="hint">Status file: '+esc(cfg.owner)+'/'+esc(cfg.repo)+'/'+esc(cfg.path)+'. Last synced '+agoTime(syncedAt)+'.</p>'+tokenForm()+'</section>'+
+    '<section class="hud panel" style="margin-top:14px"><h2>Install on iPhone</h2><p class="hint" style="margin:6px 0 0">In Safari tap Share, then "Add to Home Screen". The app then opens full screen and works offline with the last synced copy.</p></section>';
+}
+function radar(attrs){
+  var n=attrs.length; if(n<3) return '';
+  var cx=170, cy=150, R=100, pts=[], rings='', axes='', labels='';
+  function pt(i,v){ var a=-Math.PI/2+i*2*Math.PI/n; return [cx+Math.cos(a)*R*v/10, cy+Math.sin(a)*R*v/10]; }
+  [2,4,6,8,10].forEach(function(v){ var ring=[]; for(var i=0;i<n;i++) ring.push(pt(i,v).map(function(x){return x.toFixed(1);}).join(',')); rings+='<polygon points="'+ring.join(' ')+'" fill="none" stroke="var(--line)"/>'; });
+  for(var i=0;i<n;i++){ var e=pt(i,10), l=pt(i,12.6), v=attrs[i][1];
+    axes+='<line x1="'+cx+'" y1="'+cy+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="var(--line)"/>';
+    var anchor=Math.abs(l[0]-cx)<8?'middle':(l[0]>cx?'start':'end');
+    labels+='<text x="'+l[0].toFixed(1)+'" y="'+l[1].toFixed(1)+'" text-anchor="'+anchor+'" dominant-baseline="middle">'+esc(attrs[i][0])+' <tspan class="val">'+v+'</tspan></text>';
+    pts.push(pt(i,Math.max(v,0.3)).map(function(x){return x.toFixed(1);}).join(',')); }
+  return '<svg class="radar" viewBox="0 0 340 300" role="img" aria-label="Skill chart">'+rings+axes+'<polygon points="'+pts.join(' ')+'" fill="color-mix(in srgb,var(--gold) 22%,transparent)" stroke="var(--gold)" stroke-width="2"/>'+labels+'</svg>';
+}
+function ghHTML(p){
+  var g=p.github, l=p.local, h='';
+  if(g) h+='<div class="ghbox"><b>GitHub</b>: '+(g.commits!=null?g.commits+' commits, ':'')+'last push '+ago(g.pushedAt||g.lastCommitDate)+(g.lastMessage?'<br>“'+esc(g.lastMessage)+'”':'')+'<br><a href="https://github.com/'+esc(cfg.owner)+'/'+esc(p.repo)+'" target="_blank" rel="noopener">Open on GitHub</a></div>';
+  if(l) h+='<div class="ghbox"><b>On the Mac</b>: '+(l.commits!=null?l.commits+' commits, ':'')+'last commit '+ago(l.lastCommitDate)+(l.lastMessage?'<br>“'+esc(l.lastMessage)+'”':'')+'</div>';
+  return h;
+}
+function viewDetail(p){
+  var S=stages(), r=flagCount(p,'red');
+  var h='<a class="back" href="#">&#8592; All projects</a>';
+  h+='<section class="hud dhead"><div class="glyph">'+glyph(p.glyph)+'</div><div><h1>'+esc(p.name)+'</h1><p class="cls">'+esc(p.cls)+' &nbsp;<span class="stagepill '+stageCls(p)+'">'+stageLabel(p)+'</span></p><p class="tagline">'+esc(p.tagline)+'</p></div>'+
+    '<div class="dlv"><small>Level</small><b class="num">'+level(p)+'</b><small>active '+ago(p.lastActivity)+'</small></div></section>';
+  h+='<div class="track">'+S.map(function(s,i){return '<div class="'+(i<p.stage?'done':i===p.stage?'now':'')+'">'+esc(s)+'</div>';}).join('')+'</div>';
+  h+='<div class="dgrid"><div class="col">';
+  h+='<section class="hud panel prose"><h2>What it is</h2>'+p.about.map(function(t){return '<p>'+esc(t)+'</p>';}).join('')+'</section>';
+  h+='<section class="hud panel"><h2>Open quests</h2>'+legend()+'<ul class="qlist">'+p.quests.map(function(q){return questRow(p,q,false);}).join('')+'</ul></section>';
+  h+='<section class="hud panel"><h2>What it can do</h2><ul class="list">'+p.features.map(function(f){return '<li>'+esc(f)+'</li>';}).join('')+'</ul></section>';
+  h+='<section class="hud panel"><h2>Achievements unlocked</h2><div class="ach">'+p.achievements.map(function(a){return '<div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6.3 6.9.9-5 4.8 1.2 6.9L12 17.7 5.9 21l1.2-6.9-5-4.8 6.9-.9z"/></svg>'+esc(a)+'</div>';}).join('')+'</div></section>';
+  h+='<section class="hud panel"><h2>Timeline</h2><ul class="feed" style="margin-top:10px">'+p.timeline.slice().reverse().map(function(t){return '<li><time>'+fmtDate(t[0])+'</time><p>'+esc(t[1])+'</p></li>';}).join('')+'</ul></section>';
+  h+='</div><div class="col">';
+  h+='<section class="hud panel"><h2>Stats</h2>'+barsHTML(p)+'<div class="statgrid">'+p.stats.map(function(s){return '<div><b>'+esc(s[0])+'</b><span>'+esc(s[1])+'</span></div>';}).join('')+'</div>'+ghHTML(p)+'</section>';
+  h+='<section class="hud panel"><h2>Skill chart</h2><p class="hint">Each skill scored 0–10</p>'+radar(p.attrs)+'</section>';
+  h+='<section class="hud panel nextmove"><h2>Next move</h2><p style="margin-top:6px">'+esc(p.next)+'</p></section>';
+  h+='<section class="hud panel'+(r?' boss':'')+'"><h2>'+(r?'Boss fight':'Main blocker')+'</h2><p style="margin-top:6px">'+esc(p.boss)+'</p></section>';
+  h+='<section class="hud panel"><h2>Gear</h2><div class="gear">'+p.stack.map(function(s){return '<span>'+esc(s[0])+(s[1]?'<small>'+esc(s[1])+'</small>':'')+'</span>';}).join('')+'</div></section>';
+  h+='<section class="hud panel"><h2>Where it lives</h2><dl class="kv">'+p.where.map(function(w){return '<dt>'+esc(w[0])+'</dt><dd>'+esc(w[1])+'</dd>';}).join('')+'</dl>'+(p.run?'<pre><code>'+esc(p.run)+'</code></pre>':'')+'</section>';
+  if(token) h+=editorHTML(p);
+  return h+'</div></div>';
+}
+function editorHTML(p){
+  return '<section class="hud panel editor"><h2>Update status</h2><p class="hint">Saves to GitHub; every device sees it.</p>'+
+    '<label class="field" for="eStage">Stage<select id="eStage">'+stages().map(function(s,i){return '<option value="'+i+'"'+(i===p.stage?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</select></label>'+
+    '<label class="field" for="eProg">Progress <b id="eProgV" class="num">'+p.progress+'%</b><input type="range" id="eProg" min="0" max="100" step="5" value="'+p.progress+'"></label>'+
+    '<label class="field" for="eHealth">Health <b id="eHealthV" class="num">'+p.health+'</b><input type="range" id="eHealth" min="0" max="100" step="5" value="'+p.health+'"></label>'+
+    '<label class="field row" for="ePaused"><input type="checkbox" id="ePaused"'+(p.paused?' checked':'')+'> Paused</label>'+
+    '<label class="field" for="eNext">Next move<textarea id="eNext" rows="3">'+esc(p.next)+'</textarea></label>'+
+    '<label class="field" for="eLog">Add to timeline (optional)<input type="text" id="eLog" placeholder="e.g. Finished Task 11"></label>'+
+    '<div class="row" style="margin-top:14px"><button type="button" class="btn" id="eSave" data-p="'+esc(p.id)+'">Save status</button><span class="saved" id="eMsg" role="status"></span></div></section>';
+}
+
+/* ---------- router ---------- */
+var app=document.getElementById('app'), lastRoute=null;
+function route(){ return (location.hash||'').replace('#',''); }
+function render(){
+  var id=route(), y=window.scrollY, html, tab='board';
+  if(!token && id!=='settings'){ html=viewConnect(); tab='settings'; }
+  else if(id==='settings'){ html=viewSettings(); tab='settings'; }
+  else if(id==='quests'){ html=viewQuests(); tab='quests'; }
+  else if(id==='log'){ html=viewLog(); tab='log'; }
+  else if(id && get(id)){ html=viewDetail(get(id)); }
+  else if(!DATA){ html='<p style="margin-top:24px">Loading from GitHub…</p>'+(lastError?'<p class="err">'+esc(lastError)+'</p>':''); }
+  else html=viewBoard();
+  var ae=document.activeElement;
+  if(ae && ae.closest && ae.closest('#app') && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && lastRoute===id) return; // don't wipe typing
+  app.innerHTML=html;
+  document.querySelectorAll('.tabbar a').forEach(function(a){ if(a.getAttribute('data-tab')===tab) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  var reds=all().reduce(function(s,p){return s+flagCount(p,'red');},0), b=document.getElementById('qBadge');
+  b.hidden=!reds; b.textContent=reds;
+  window.scrollTo(0, lastRoute===id ? y : 0); lastRoute=id;
+}
+window.addEventListener('hashchange',render);
+
+/* ---------- events ---------- */
+app.addEventListener('click',function(e){
+  var t=e.target.closest('[data-filter]');
+  if(t){ filter=t.getAttribute('data-filter'); lsSet('ps-filter',filter); render(); return; }
+  if(e.target.closest('#feedMore')){ feedAll=!feedAll; render(); return; }
+  var m=e.target.closest('[data-mode]');
+  if(m){ applyMode(m.getAttribute('data-mode')); render(); return; }
+  var tk=e.target.closest('.tick');
+  if(tk){ e.preventDefault(); var pid=tk.getAttribute('data-p'), qid=tk.getAttribute('data-q'); tk.disabled=true;
+    commitChange(function(d){ var p=d.projects.filter(function(x){return x.id===pid;})[0]; if(!p) return; p.doneQuests=p.doneQuests||{}; if(p.doneQuests[qid]) delete p.doneQuests[qid]; else p.doneQuests[qid]=true; }, 'Update quest '+qid+' on '+pid); return; }
+  if(e.target.closest('#sSave')){
+    var o=document.getElementById('sOwner').value.trim(), rp=document.getElementById('sRepo').value.trim(), tv=document.getElementById('sToken').value.trim();
+    cfg.owner=o||DEFAULTS.owner; cfg.repo=rp||DEFAULTS.repo; lsSet('ps-cfg',JSON.stringify({owner:cfg.owner,repo:cfg.repo}));
+    if(tv){ token=tv; lsSet('ps-token',tv); }
+    lastError=''; document.activeElement&&document.activeElement.blur();
+    if(location.hash==='#settings'||!location.hash) location.hash=''; load(); return;
+  }
+  if(e.target.closest('#sForget')){ token=''; lsSet('ps-token',null); lsSet('ps-cache',null); DATA=null; SHA=null; setSync('off'); render(); return; }
+  var sv=e.target.closest('#eSave');
+  if(sv){ var pid2=sv.getAttribute('data-p');
+    var f={stage:+document.getElementById('eStage').value, progress:+document.getElementById('eProg').value, health:+document.getElementById('eHealth').value,
+      paused:document.getElementById('ePaused').checked, next:document.getElementById('eNext').value.trim(), lastActivity:todayStr()};
+    var logTxt=document.getElementById('eLog').value.trim();
+    sv.disabled=true; document.activeElement&&document.activeElement.blur();
+    commitChange(function(d){ var p=d.projects.filter(function(x){return x.id===pid2;})[0]; if(!p) return;
+      Object.keys(f).forEach(function(k){ if(k==='next'&&!f[k]) return; p[k]=f[k]; });
+      if(logTxt){ p.log=p.log||[]; p.log.push({date:todayStr(),text:logTxt}); } }, 'Update status of '+pid2)
+      .then(function(ok){ var msg=document.getElementById('eMsg'); if(msg) msg.textContent=ok?'Saved':'Not saved — '+lastError; });
+  }
+});
+app.addEventListener('input',function(e){
+  if(e.target.id==='eProg') document.getElementById('eProgV').textContent=e.target.value+'%';
+  if(e.target.id==='eHealth') document.getElementById('eHealthV').textContent=e.target.value;
+});
+document.getElementById('refresh').addEventListener('click',function(){ load(); });
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && token && (!syncedAt || Date.now()-new Date(syncedAt)>30000)) load(); });
+window.addEventListener('online',function(){ load(); });
+setInterval(function(){ if(document.visibilityState==='visible' && token) load(); }, 120000);
+
+/* ---------- sync pill + theme ---------- */
+function setSync(s){
+  syncState=s; var el=document.getElementById('live'), tx=document.getElementById('liveText'), rb=document.getElementById('refresh');
+  el.className='live'+(s==='on'?' on':s==='warn'?' warn':'');
+  tx.textContent = s==='on'?'Synced':s==='busy'?'Syncing…':s==='warn'?'Saved copy':'Offline';
+  rb.classList.toggle('spin',s==='busy');
+}
+function applyMode(m){
+  var root=document.documentElement;
+  if(m==='light'||m==='dark'){ root.setAttribute('data-theme',m); lsSet('ps-theme',m); } else { root.removeAttribute('data-theme'); lsSet('ps-theme',null); }
+  var dark = root.getAttribute('data-theme')==='dark' || (!root.getAttribute('data-theme') && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', dark?'#0A0E19':'#E9EDF4');
+}
+applyMode(lsGet('ps-theme')||'auto');
+
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+setSync(DATA?'warn':'off');
+render();
+load();
+})();
+</script>
+</body>
+</html>

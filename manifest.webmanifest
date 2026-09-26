@@ -1,0 +1,15 @@
+{
+  "name": "Project Stats",
+  "short_name": "Stats",
+  "description": "Personal project status board, synced through a private GitHub repo.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0A0E19",
+  "theme_color": "#0A0E19",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
