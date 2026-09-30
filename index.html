@@ -508,6 +508,7 @@ function viewBoard(){
   var h=heroHTML(avg, ps.length+' projects, last activity '+ago(lastDay)+', synced '+agoTime(syncedAt),
     [[ps.length,'projects','var(--cyan)'],[active,'in progress','var(--good)'],[reds,'red problems','var(--bad)'],[doneAll,'cleared','var(--gold)']], reds, '#quests');
   if(lastError) h+='<p class="err" role="alert">'+esc(lastError)+'</p>';
+  if(DATA&&DATA.robotWarning) h+='<p class="err" role="status">GitHub robot: '+esc(DATA.robotWarning)+' Private projects will not update by themselves until the key is added.</p>';
   var gs=groups(), counts={all:ps.length};
   gs.forEach(function(g){counts[g.id]=ps.filter(function(p){return p.group===g.id;}).length;});
   h+='<div class="tabs" role="group" aria-label="Filter projects">'+[['all','All']].concat(gs.map(function(g){return [g.id,g.name];})).map(function(t){
@@ -547,7 +548,7 @@ function viewLog(){
   var feed=[]; all().forEach(function(p){ p.timeline.forEach(function(t){feed.push({p:p,d:t[0],t:t[1]});}); });
   feed.sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:0;});
   var shown=feedAll?feed:feed.slice(0,25);
-  return '<div class="section-h"><h2>Activity log</h2><p>Newest first'+(DATA&&DATA.syncedFromGitHubAt?', GitHub checked '+agoTime(DATA.syncedFromGitHubAt):'')+'</p></div><section class="hud panel"><ul class="feed">'+
+  return '<div class="section-h"><h2>Activity log</h2><p>Newest first'+(DATA&&DATA.syncedFromGitHubAt?', newest GitHub commit seen '+agoTime(DATA.syncedFromGitHubAt):'')+'</p></div><section class="hud panel"><ul class="feed">'+
     shown.map(function(f){return '<li><time>'+fmtDate(f.d)+'</time><p><a href="#'+esc(f.p.id)+'">'+esc(f.p.name)+'</a> '+esc(f.t)+'</p></li>';}).join('')+'</ul>'+
     (feed.length>25?'<button type="button" class="showmore" id="feedMore">'+(feedAll?'Show less':'Show all '+feed.length+' entries')+'</button>':'')+'</section>';
 }
