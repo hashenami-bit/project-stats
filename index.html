@@ -523,7 +523,8 @@ function viewBoard(){
   var h=heroHTML(avg, ps.length+' projects, last activity '+ago(lastDay)+', synced '+agoTime(syncedAt),
     [[ps.length,'projects','var(--cyan)'],[active,'in progress','var(--good)'],[reds,'red problems','var(--bad)'],[doneAll,'cleared','var(--gold)']], reds, '#quests');
   if(lastError) h+='<p class="err" role="alert">'+esc(lastError)+'</p>';
-  if(DATA&&DATA.robotWarning) h+='<p class="err" role="status">GitHub robot: '+esc(DATA.robotWarning)+' Private projects will not update by themselves until the key is added.</p>';
+  var macAge=DATA&&DATA.macSyncAt?(Date.now()-new Date(DATA.macSyncAt))/36e5:1e9;   // hours since the Mac last synced
+  if(DATA&&macAge>3) h+='<p class="err" role="status">The Mac has not synced for '+(macAge>1e8?'a long time':agoTime(DATA.macSyncAt).replace(' ago',''))+'. Local and private projects update only while the Mac is on and online.</p>';
   var gs=groups(), counts={all:ps.length};
   gs.forEach(function(g){counts[g.id]=ps.filter(function(p){return p.group===g.id;}).length;});
   h+='<div class="tabs" role="group" aria-label="Filter projects">'+[['all','All']].concat(gs.map(function(g){return [g.id,g.name];})).map(function(t){
